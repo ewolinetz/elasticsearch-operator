@@ -16,7 +16,7 @@ spec:
       serviceAccountName: elasticsearch-operator
       containers:
         - name: elasticsearch-operator
-          image: openshift/origin-elasticsearch-operator:latest
+          image: image-registry.openshift-image-registry.svc:5000/openshift/elasticsearch-operator:latest
           imagePullPolicy: IfNotPresent
           command:
           - elasticsearch-operator
