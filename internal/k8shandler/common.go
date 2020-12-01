@@ -312,6 +312,10 @@ func newEnvVars(nodeName, clusterName, instanceRAM string, roleMap map[api.Elast
 			Name:  "HAS_DATA",
 			Value: strconv.FormatBool(roleMap[api.ElasticsearchRoleData]),
 		},
+		{
+			Name:  "IS_INGEST",
+			Value: strconv.FormatBool(roleMap[api.ElasticsearchRoleClient]),
+		},
 	}
 }
 
