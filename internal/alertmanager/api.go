@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"path"
 	"strings"
 
 	"github.com/ViaQ/logerr/kverrors"
+	"github.com/ViaQ/logerr/log"
 )
 
 type Alerts struct {
@@ -38,6 +38,7 @@ func NewClient(url string, httpClient *http.Client, bearerToken string) *Client 
 
 func (c *Client) Alerts() (*Alerts, error) {
 	resp, err := c.allAlerts()
+
 	if err != nil {
 		return nil, err
 	}
@@ -69,11 +70,14 @@ func (c *Client) Alerts() (*Alerts, error) {
 		}
 	}
 
+	log.Info("processed alerts", "res", res)
+
 	return res, nil
 }
 
 func (c *Client) allAlerts() (*GetAlertsResponse, error) {
-	uri := path.Join(c.baseURL, "/api/v1/alerts")
+	uri := c.baseURL + "/api/v1/alerts"
+
 	req, err := http.NewRequest(http.MethodGet, uri, nil)
 	if err != nil {
 		return nil, kverrors.Wrap(err, "failed to create request")

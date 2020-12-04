@@ -2,8 +2,11 @@ package k8shandler
 
 import (
 	"context"
+	"net/http"
 
+	"github.com/ViaQ/logerr/log"
 	v1 "github.com/openshift/elasticsearch-operator/apis/logging/v1"
+	"github.com/openshift/elasticsearch-operator/internal/alertmanager"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 )
@@ -12,10 +15,16 @@ const max_node_count = 5
 
 func (er *ElasticsearchRequest) ReconfigureCR() error {
 
-	var am AlertManager
-	alerts := am.Alerts()
+	amClient := alertmanager.NewClient("https://alertmanager-main-openshift-monitoring.apps.<user>.devcluster.openshift.com",
+		http.DefaultClient, "<kube-token>")
+	alerts, err := amClient.Alerts()
+
+	if err != nil {
+		return err
+	}
 
 	if alerts == nil {
+		log.Info("Alerts are nil")
 		return nil
 	}
 
@@ -28,11 +37,16 @@ func (er *ElasticsearchRequest) ReconfigureCR() error {
 	// queue up several different changes at once
 	cluster := er.cluster
 
+	log.Info("Recieved alerts", "alerts", alerts)
+
 	// scale up data/ingest
-	if alerts.heap_high || alerts.disk_usage_low || alerts.low_watermark {
+	if alerts.HeapHigh || alerts.DiskAvailabilityLow || alerts.LowWatermark {
 		for index, node := range cluster.Spec.Nodes {
 			if isDataNode(node) {
-				cluster.Spec.Nodes[index].NodeCount += 1
+				if cluster.Spec.Nodes[index].NodeCount < max_node_count {
+					log.Info("scaling up data nodes!", "alerts", alerts)
+					cluster.Spec.Nodes[index].NodeCount += 1
+				}
 			}
 		}
 	}
@@ -44,6 +58,7 @@ func (er *ElasticsearchRequest) ReconfigureCR() error {
 	if dataCount >= 3 && masterCount < 3 {
 		for index, node := range cluster.Spec.Nodes {
 			if isMasterNode(node) {
+				log.Info("Scaling up master nodes!")
 				cluster.Spec.Nodes[index].NodeCount = 3
 			}
 		}

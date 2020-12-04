@@ -88,8 +88,8 @@
       "message": "JVM Heap usage on the node {{ $labels.node }} in {{ $labels.cluster }} cluster is {{ $value }}%."
       "summary": "JVM Heap usage on the node is high"
     "expr": |
-      sum by (cluster, instance, node) (es_jvm_mem_heap_used_percent) > 75
-    "for": "10m"
+      sum by (cluster, instance, node) (es_jvm_mem_heap_used_percent) > 0
+    "for": "1m"
     "labels":
       "severity": "alert"
 
