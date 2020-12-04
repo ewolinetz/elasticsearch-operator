@@ -11,6 +11,7 @@ node:
   name: ${DC_NAME}
   master: ${IS_MASTER}
   data: ${HAS_DATA}
+  ingest: ${IS_INGEST}
   max_local_storage_nodes: 1
 
 action.auto_create_index: "-*-write,+*"

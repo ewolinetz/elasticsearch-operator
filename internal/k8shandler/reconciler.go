@@ -78,5 +78,9 @@ func Reconcile(requestCluster *elasticsearchv1.Elasticsearch, requestClient clie
 		return kverrors.Wrap(err, "Failed to reconcile IndexMangement for Elasticsearch cluster")
 	}
 
+	if err := elasticsearchRequest.ReconfigureCR(); err != nil {
+		return kverrors.Wrap(err, "Failed to reconfigure elasticsearch CR")
+	}
+
 	return nil
 }
