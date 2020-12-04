@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/ViaQ/logerr/kverrors"
-	"github.com/ViaQ/logerr/log"
 )
 
 type Alerts struct {
@@ -69,8 +68,6 @@ func (c *Client) Alerts() (*Alerts, error) {
 			res.WriteRejections = true
 		}
 	}
-
-	log.Info("processed alerts", "res", res)
 
 	return res, nil
 }

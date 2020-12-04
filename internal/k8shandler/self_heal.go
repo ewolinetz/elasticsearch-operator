@@ -2,7 +2,10 @@ package k8shandler
 
 import (
 	"context"
+	"crypto/tls"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/ViaQ/logerr/log"
 	v1 "github.com/openshift/elasticsearch-operator/apis/logging/v1"
@@ -15,8 +18,26 @@ const max_node_count = 5
 
 func (er *ElasticsearchRequest) ReconfigureCR() error {
 
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+				DualStack: true,
+			}).DialContext,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+
 	amClient := alertmanager.NewClient("https://alertmanager-main-openshift-monitoring.apps.<user>.devcluster.openshift.com",
-		http.DefaultClient, "<kube-token>")
+		httpClient, "<kube-admin token>")
 	alerts, err := amClient.Alerts()
 
 	if err != nil {
@@ -37,7 +58,7 @@ func (er *ElasticsearchRequest) ReconfigureCR() error {
 	// queue up several different changes at once
 	cluster := er.cluster
 
-	log.Info("Recieved alerts", "alerts", alerts)
+	log.Info("Received alerts", "alerts", alerts)
 
 	// scale up data/ingest
 	if alerts.HeapHigh || alerts.DiskAvailabilityLow || alerts.LowWatermark {
@@ -64,7 +85,7 @@ func (er *ElasticsearchRequest) ReconfigureCR() error {
 		}
 	}
 
-	var currentCR *v1.Elasticsearch
+	currentCR := &v1.Elasticsearch{}
 	objectKey := types.NamespacedName{
 		Name:      cluster.Name,
 		Namespace: cluster.Namespace,
