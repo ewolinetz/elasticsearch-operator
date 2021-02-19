@@ -2,6 +2,8 @@ package elasticsearch
 
 import (
 	"strings"
+
+	"github.com/ViaQ/logerr/log"
 )
 
 func parseBool(path string, interfaceMap map[string]interface{}) bool {
@@ -10,6 +12,8 @@ func parseBool(path string, interfaceMap map[string]interface{}) bool {
 	if parsedBool, ok := value.(bool); ok {
 		return parsedBool
 	} else {
+
+		log.Info("unable to parse as a bool", "value", value)
 		return false
 	}
 }
@@ -40,7 +44,7 @@ func parseFloat64(path string, interfaceMap map[string]interface{}) float64 {
 
 func walkInterfaceMap(path string, interfaceMap map[string]interface{}) interface{} {
 	current := interfaceMap
-	keys := strings.Split(path, ".")
+	keys := strings.Split(path, ",")
 	keyCount := len(keys)
 
 	for index, key := range keys {

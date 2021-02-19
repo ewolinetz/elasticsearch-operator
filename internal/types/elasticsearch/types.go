@@ -40,6 +40,7 @@ type Index struct {
 	// Name  intentionally not serialized
 	Name     string                 `json:"-"`
 	Settings IndexSettings          `json:"settings,omitempty"`
+	Defaults IndexSettings          `json:"defaults,omitempty"`
 	Aliases  map[string]IndexAlias  `json:"aliases,omitempty"`
 	Mappings map[string]interface{} `json:"mappings,omitempty"`
 }
@@ -96,14 +97,16 @@ type IndexSettings struct {
 }
 
 type IndexingSettings struct {
-	Format  int32                 `json:"format,omitempty"`
-	Blocks  *IndexBlocksSettings  `json:"blocks,omitempty"`
-	Mapper  *IndexMapperSettings  `json:"mapper,omitempty"`
-	Mapping *IndexMappingSettings `json:"mapping,omitempty"`
+	Format   int32                 `json:"format,omitempty"`
+	Blocks   *IndexBlocksSettings  `json:"blocks,omitempty"`
+	Mapper   *IndexMapperSettings  `json:"mapper,omitempty"`
+	Mapping  *IndexMappingSettings `json:"mapping,omitempty"`
+	Priority int32                 `json:"priority,omitempty"`
 }
 
 type IndexBlocksSettings struct {
-	Write bool `json:"write"`
+	Write               bool `json:"write"`
+	ReadOnlyAllowDelete bool `json:"read_only_allow_delete"`
 }
 
 type IndexMapperSettings struct {

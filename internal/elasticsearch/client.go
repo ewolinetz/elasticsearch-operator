@@ -43,6 +43,7 @@ type Client interface {
 	GetMinMasterNodes() (int32, error)
 	SetMinMasterNodes(numberMasters int32) (bool, error)
 	DoSynchronizedFlush() (bool, error)
+	PrioritizeAndUnlockSecurity() error
 
 	// Cluster State API
 	GetLowestClusterVersion() (string, error)
@@ -70,6 +71,7 @@ type Client interface {
 
 	// Nodes API
 	GetNodeDiskUsage(nodeName string) (string, float64, error)
+	NodesExceedingUsage() bool
 
 	// Replicas
 	UpdateReplicaCount(replicaCount int32) error

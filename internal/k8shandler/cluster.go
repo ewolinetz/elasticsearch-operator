@@ -168,6 +168,9 @@ func (er *ElasticsearchRequest) CreateOrUpdateElasticsearchCluster() error {
 		// add alias to old indices if they exist and don't have one
 		// this should be removed after one release...
 		if er.ClusterReady() {
+
+			esClient.PrioritizeAndUnlockSecurity()
+
 			if aliasNeededMap == nil {
 				aliasNeededMap = make(map[string]bool)
 			}

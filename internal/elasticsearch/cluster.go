@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ViaQ/logerr/kverrors"
+	"github.com/ViaQ/logerr/log"
 	estypes "github.com/openshift/elasticsearch-operator/internal/types/elasticsearch"
 	"github.com/openshift/elasticsearch-operator/internal/utils/comparators"
 )
@@ -21,7 +22,7 @@ func (ec *esClient) GetClusterNodeVersions() ([]string, error) {
 	ec.fnSendEsRequest(ec.cluster, ec.namespace, payload, ec.k8sClient)
 
 	var nodeVersions []string
-	if versions := walkInterfaceMap("nodes.versions", payload.ResponseBody); versions != nil {
+	if versions := walkInterfaceMap("nodes,versions", payload.ResponseBody); versions != nil {
 		for _, value := range versions.([]interface{}) {
 			version := value.(string)
 			nodeVersions = append(nodeVersions, version)
@@ -42,19 +43,19 @@ func (ec *esClient) GetThresholdEnabled() (bool, error) {
 	var enabled interface{}
 
 	if value := walkInterfaceMap(
-		"defaults.cluster.routing.allocation.disk.threshold_enabled",
+		"defaults,cluster,routing,allocation,disk,threshold_enabled",
 		payload.ResponseBody); value != nil {
 		enabled = value
 	}
 
 	if value := walkInterfaceMap(
-		"persistent.cluster.routing.allocation.disk.threshold_enabled",
+		"persistent,cluster,routing,allocation,disk,threshold_enabled",
 		payload.ResponseBody); value != nil {
 		enabled = value
 	}
 
 	if value := walkInterfaceMap(
-		"transient.cluster.routing.allocation.disk.threshold_enabled",
+		"transient,cluster,routing,allocation,disk,threshold_enabled",
 		payload.ResponseBody); value != nil {
 		enabled = value
 	}
@@ -81,37 +82,37 @@ func (ec *esClient) GetDiskWatermarks() (interface{}, interface{}, error) {
 	var high interface{}
 
 	if value := walkInterfaceMap(
-		"defaults.cluster.routing.allocation.disk.watermark.low",
+		"defaults,cluster,routing,allocation,disk,watermark,low",
 		payload.ResponseBody); value != nil {
 		low = value
 	}
 
 	if value := walkInterfaceMap(
-		"defaults.cluster.routing.allocation.disk.watermark.high",
+		"defaults,cluster,routing,allocation,disk,watermark,high",
 		payload.ResponseBody); value != nil {
 		high = value
 	}
 
 	if value := walkInterfaceMap(
-		"persistent.cluster.routing.allocation.disk.watermark.low",
+		"persistent,cluster,routing,allocation,disk,watermark,low",
 		payload.ResponseBody); value != nil {
 		low = value
 	}
 
 	if value := walkInterfaceMap(
-		"persistent.cluster.routing.allocation.disk.watermark.high",
+		"persistent,cluster,routing,allocation,disk,watermark,high",
 		payload.ResponseBody); value != nil {
 		high = value
 	}
 
 	if value := walkInterfaceMap(
-		"transient.cluster.routing.allocation.disk.watermark.low",
+		"transient,cluster,routing,allocation,disk,watermark,low",
 		payload.ResponseBody); value != nil {
 		low = value
 	}
 
 	if value := walkInterfaceMap(
-		"transient.cluster.routing.allocation.disk.watermark.high",
+		"transient,cluster,routing,allocation,disk,watermark,high",
 		payload.ResponseBody); value != nil {
 		high = value
 	}
@@ -271,4 +272,110 @@ func (ec *esClient) IsNodeInCluster(nodeName string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (ec *esClient) PrioritizeAndUnlockSecurity() error {
+
+	securityPriorityValue := int32(10)
+	updateRequired := false
+	indexSetting := estypes.IndexSettings{
+		Index: &estypes.IndexingSettings{},
+	}
+
+	// get index settings for .security
+	payload := &EsRequest{
+		Method: http.MethodGet,
+		URI:    ".security/_settings?include_defaults=true",
+	}
+
+	ec.fnSendEsRequest(ec.cluster, ec.namespace, payload, ec.k8sClient)
+
+	var priority interface{}
+
+	if value := walkInterfaceMap(
+		".security,defaults,index,priority",
+		payload.ResponseBody); value != nil {
+		priority = value
+	}
+
+	if value := walkInterfaceMap(
+		".security,settings,index,priority",
+		payload.ResponseBody); value != nil {
+		priority = value
+	}
+
+	var priorityValue int32
+
+	if priorityString, ok := priority.(string); ok {
+		if priorityString != "" {
+			priorityInt, err := strconv.ParseInt(priorityString, 10, 32)
+			if err != nil {
+				return err
+			}
+
+			priorityValue = int32(priorityInt)
+		}
+	}
+
+	log.Info("checking .security priority level", "priorityValue", priorityValue)
+
+	// ensure that the .security index index.priority setting is > 1
+	if priorityValue < securityPriorityValue {
+		log.Info("updating priority level", "securityPriorityLevel", securityPriorityValue)
+		indexSetting.Index.Priority = securityPriorityValue
+		updateRequired = true
+	}
+
+	// check if we have watermark thresholds met
+	if !ec.NodesExceedingUsage() {
+
+		log.Info("Not exceeding usage")
+
+		var readOnlyInterface interface{}
+
+		// (as long as we aren't in a disk watermark threshold issue)
+		// ensure that index.blocks.read_only_allow_delete is 'false'
+
+		if value := walkInterfaceMap(
+			".security,defaults,index,blocks,read_only_allow_delete",
+			payload.ResponseBody); value != nil {
+			readOnlyInterface = value
+		}
+
+		if value := walkInterfaceMap(
+			".security,settings,index,blocks,read_only_allow_delete",
+			payload.ResponseBody); value != nil {
+			readOnlyInterface = value
+		}
+
+		var readOnly bool
+
+		if readOnlyString, ok := readOnlyInterface.(string); ok {
+			if readOnlyString != "" {
+				parsedBool, err := strconv.ParseBool(readOnlyString)
+				if err != nil {
+					return err
+				}
+
+				readOnly = parsedBool
+			}
+		}
+
+		log.Info("checking if readOnly", "readOnly", readOnly)
+
+		if readOnly {
+			indexSetting.Index.Blocks = &estypes.IndexBlocksSettings{
+				ReadOnlyAllowDelete: false,
+			}
+			updateRequired = true
+		}
+	}
+
+	// update settings
+	if updateRequired {
+		log.Info("update is required", "setting", indexSetting)
+		return ec.UpdateIndexSettings(".security", &indexSetting)
+	}
+
+	return nil
 }
